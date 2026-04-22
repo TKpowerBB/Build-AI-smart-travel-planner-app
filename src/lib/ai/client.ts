@@ -5,9 +5,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 // 사용 가능한 모델 우선순위 (위에서부터 시도)
 const MODELS = [
-  'gemini-2.5-flash-preview-04-17',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
   'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-2.0-flash-lite',
 ];
 
 async function tryGenerateContent(prompt: string, systemInstruction: string) {
