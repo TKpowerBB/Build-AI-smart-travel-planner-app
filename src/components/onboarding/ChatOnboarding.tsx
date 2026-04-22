@@ -72,8 +72,9 @@ export default function ChatOnboarding() {
         // All info collected — start generation
         await startGeneration(merged as TravelProfile);
       }
-    } catch {
-      addMessage('ai', 'Something went wrong. Please try again.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      addMessage('ai', `❌ Error: ${msg}`);
     }
     setLoading(false);
   };
