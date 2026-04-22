@@ -3,7 +3,7 @@ import { SYSTEM_PROMPT } from './prompts/itinerary';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-const MODEL = 'gemini-1.5-flash';
+const MODEL = 'gemini-2.5-flash-preview-04-17';
 
 // Returns a ReadableStream of JSON text chunks
 export async function streamGenerateItinerary(userPrompt: string): Promise<ReadableStream<Uint8Array>> {
