@@ -49,12 +49,23 @@ export default function ChatOnboarding() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      const result: ExtractResult = await res.json();
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || `Server error ${res.status}`);
+      }
+
+      const result = json as ExtractResult;
 
       if (result.error === 'TRIP_TOO_LONG') {
         addMessage('ai', "⚠️ That's more than 15 days! Please shorten your trip to a maximum of 15 days.");
         setLoading(false);
         return;
+      }
+
+      if (!result.profile) {
+        throw new Error('AI did not return a valid profile. Please try again.');
       }
 
       const merged = { ...profile, ...Object.fromEntries(
