@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { TravelProfile, ExtractResult } from '@/types';
+import { TravelProfile, ExtractResult, DailyItinerary } from '@/types';
+import { repairItinerary } from '@/utils/repairItinerary';
 import ChatBubble from './ChatBubble';
 
 type Message = { role: 'ai' | 'user'; text: string };
@@ -124,13 +125,18 @@ export default function ChatOnboarding() {
 
       // Validate before navigating so a parse failure surfaces as a chat error
       // instead of silently bouncing back to /onboarding
+      let parsed: { title: string; itinerary: DailyItinerary[] };
       try {
-        JSON.parse(cleaned);
+        parsed = JSON.parse(cleaned);
       } catch {
         throw new Error('AI returned invalid itinerary JSON. Please try again.');
       }
+      if (!parsed || !Array.isArray(parsed.itinerary)) {
+        throw new Error('AI response missing itinerary array.');
+      }
+      parsed.itinerary = repairItinerary(parsed.itinerary);
 
-      sessionStorage.setItem('travelItinerary', cleaned);
+      sessionStorage.setItem('travelItinerary', JSON.stringify(parsed));
       router.push('/plan/new');
     } catch (e: unknown) {
       addMessage('ai', `❌ Generation failed: ${e instanceof Error ? e.message : 'Unknown error'}. Please try again.`);

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DailyItinerary, TravelProfile } from '@/types';
 import { injectAds } from '@/utils/adInjector';
+import { repairItinerary } from '@/utils/repairItinerary';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
 import PlannerChat from '@/components/planner/PlannerChat';
@@ -27,7 +28,7 @@ export default function SavedPlanPage() {
         if (data.error) { router.push('/plans'); return; }
         setTitle(data.title);
         setProfile(data.profile);
-        setItinerary(injectAds(data.itinerary));
+        setItinerary(injectAds(repairItinerary(data.itinerary)));
         setLoading(false);
       })
       .catch(() => router.push('/plans'));
@@ -37,11 +38,29 @@ export default function SavedPlanPage() {
     if (!profile) return;
     setEditLoading(true);
     try {
+      // Strip injected ad cards before sending — they aren't real itinerary data
+      const clean = itinerary.map((day) => ({
+        ...day,
+        cards: day.cards.filter((c) => c.type !== 'ad'),
+      }));
+
       const res = await fetch('/api/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itinerary, profile, command }),
+        body: JSON.stringify({ itinerary: clean, profile, command }),
       });
+
+      if (!res.ok) {
+        let msg = `Edit failed (${res.status})`;
+        try {
+          const err = await res.json();
+          if (err?.error) msg = err.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(msg);
+      }
+
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let text = '';
@@ -50,15 +69,24 @@ export default function SavedPlanPage() {
         if (done) break;
         text += decoder.decode(value, { stream: true });
       }
-      const updated: DailyItinerary[] = JSON.parse(text);
-      const withAds = injectAds(updated);
-      setItinerary(withAds);
+      const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      let updated: DailyItinerary[];
+      try {
+        updated = JSON.parse(cleaned);
+      } catch {
+        throw new Error('AI returned invalid JSON. Please try again.');
+      }
+      if (!Array.isArray(updated)) {
+        throw new Error('AI response was not an itinerary array.');
+      }
+      const repaired = repairItinerary(updated);
+      setItinerary(injectAds(repaired));
 
       // Auto-save to DB
       await fetch(`/api/plans/${planId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itinerary: updated, changeNote: command }),
+        body: JSON.stringify({ itinerary: repaired, changeNote: command }),
       });
     } finally {
       setEditLoading(false);

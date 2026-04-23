@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DailyItinerary, TravelProfile, GenerateResult } from '@/types';
 import { injectAds } from '@/utils/adInjector';
+import { repairItinerary } from '@/utils/repairItinerary';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
 import PlannerChat from '@/components/planner/PlannerChat';
@@ -29,7 +30,7 @@ export default function NewPlanPage() {
     try {
       const result: GenerateResult = JSON.parse(raw);
       setTitle(result.title);
-      setItinerary(injectAds(result.itinerary));
+      setItinerary(injectAds(repairItinerary(result.itinerary)));
       setProfile(JSON.parse(prof));
     } catch {
       router.push('/onboarding');
@@ -82,8 +83,9 @@ export default function NewPlanPage() {
       if (!Array.isArray(updated)) {
         throw new Error('AI response was not an itinerary array.');
       }
-      setItinerary(injectAds(updated));
-      sessionStorage.setItem('travelItinerary', JSON.stringify({ title, itinerary: updated }));
+      const repaired = repairItinerary(updated);
+      setItinerary(injectAds(repaired));
+      sessionStorage.setItem('travelItinerary', JSON.stringify({ title, itinerary: repaired }));
     } finally {
       setEditLoading(false);
     }

@@ -54,5 +54,6 @@ RULES:
 - Each day: 6-10 cards (mix of activity + transit, day 1 starts with fixed_point, last day ends with fixed_point)
 - All times must be sequential within a day (no overlap)
 - Use realistic travel durations between locations
-- Tailor activities to companion ages, genders, and preferences`;
+- Tailor activities to companion ages, genders, and preferences
+- Every transit card MUST include ALL SIX coordinate fields (from, fromLat, fromLng, to, toLat, toLng). None may be null, omitted, or set to 0 unless the location is truly on the equator/prime meridian. The fromLat/fromLng MUST match the preceding card's coordinates, and toLat/toLng MUST match the following card's coordinates.`;
 }
