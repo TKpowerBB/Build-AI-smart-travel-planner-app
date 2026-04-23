@@ -12,11 +12,36 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [suggestSignIn, setSuggestSignIn] = useState(false);
+
+  const interpretError = (msg: string, currentMode: 'login' | 'signup') => {
+    const m = msg.toLowerCase();
+    if (currentMode === 'signup') {
+      if (m.includes('already registered') || m.includes('already exists') || m.includes('user already')) {
+        return { text: 'This email is already registered. Please sign in instead.', suggest: true };
+      }
+      if (m.includes('rate limit')) {
+        // Supabase returns "email rate limit exceeded" when signup is attempted
+        // for an existing email multiple times in a row.
+        return { text: 'Too many sign-up attempts for this email. If you already have an account, sign in instead.', suggest: true };
+      }
+    }
+    if (currentMode === 'login') {
+      if (m.includes('invalid login') || m.includes('invalid credentials')) {
+        return { text: 'Incorrect email or password.', suggest: false };
+      }
+      if (m.includes('email not confirmed')) {
+        return { text: 'Please confirm your email before signing in. Check your inbox.', suggest: false };
+      }
+    }
+    return { text: msg, suggest: false };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuggestSignIn(false);
 
     const fn = mode === 'login'
       ? supabase.auth.signInWithPassword({ email, password })
@@ -24,11 +49,19 @@ export default function LoginPage() {
 
     const { error } = await fn;
     if (error) {
-      setError(error.message);
+      const { text, suggest } = interpretError(error.message, mode);
+      setError(text);
+      setSuggestSignIn(suggest);
     } else {
       router.push(mode === 'signup' ? '/onboarding' : '/plans');
     }
     setLoading(false);
+  };
+
+  const switchMode = (m: 'login' | 'signup') => {
+    setMode(m);
+    setError('');
+    setSuggestSignIn(false);
   };
 
   return (
@@ -48,7 +81,7 @@ export default function LoginPage() {
           {(['login', 'signup'] as const).map(m => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => switchMode(m)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === m ? 'bg-white shadow text-indigo-600' : 'text-gray-500'
               }`}
@@ -82,7 +115,20 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+          {error && (
+            <div className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg space-y-2">
+              <p>{error}</p>
+              {suggestSignIn && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="inline-block text-indigo-600 font-medium hover:underline"
+                >
+                  → Switch to Sign In
+                </button>
+              )}
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading}
