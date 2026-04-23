@@ -53,7 +53,8 @@ export default function NewPlanPage() {
         if (done) break;
         text += decoder.decode(value, { stream: true });
       }
-      const updated: DailyItinerary[] = JSON.parse(text);
+      const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      const updated: DailyItinerary[] = JSON.parse(cleaned);
       setItinerary(injectAds(updated));
       sessionStorage.setItem('travelItinerary', JSON.stringify({ title, itinerary: updated }));
     } finally {

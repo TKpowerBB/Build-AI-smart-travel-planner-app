@@ -116,7 +116,21 @@ export default function ChatOnboarding() {
         jsonText += decoder.decode(value, { stream: true });
       }
 
-      sessionStorage.setItem('travelItinerary', jsonText);
+      // Strip markdown fences that the streaming model may emit
+      const cleaned = jsonText
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
+      // Validate before navigating so a parse failure surfaces as a chat error
+      // instead of silently bouncing back to /onboarding
+      try {
+        JSON.parse(cleaned);
+      } catch {
+        throw new Error('AI returned invalid itinerary JSON. Please try again.');
+      }
+
+      sessionStorage.setItem('travelItinerary', cleaned);
       router.push('/plan/new');
     } catch (e: unknown) {
       addMessage('ai', `❌ Generation failed: ${e instanceof Error ? e.message : 'Unknown error'}. Please try again.`);
