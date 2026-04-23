@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('[edit]', err);
-    return NextResponse.json({ error: 'AI edit failed' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : 'AI edit failed';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

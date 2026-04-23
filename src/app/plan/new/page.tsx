@@ -40,11 +40,30 @@ export default function NewPlanPage() {
     if (!profile) return;
     setEditLoading(true);
     try {
+      // Strip injected ad cards before sending — they aren't real itinerary data
+      const clean = itinerary
+        .map((day) => ({
+          ...day,
+          cards: day.cards.filter((c) => c.type !== 'ad'),
+        }));
+
       const res = await fetch('/api/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itinerary, profile, command }),
+        body: JSON.stringify({ itinerary: clean, profile, command }),
       });
+
+      if (!res.ok) {
+        let msg = `Edit failed (${res.status})`;
+        try {
+          const err = await res.json();
+          if (err?.error) msg = err.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(msg);
+      }
+
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let text = '';
@@ -54,7 +73,15 @@ export default function NewPlanPage() {
         text += decoder.decode(value, { stream: true });
       }
       const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-      const updated: DailyItinerary[] = JSON.parse(cleaned);
+      let updated: DailyItinerary[];
+      try {
+        updated = JSON.parse(cleaned);
+      } catch {
+        throw new Error('AI returned invalid JSON. Please try again.');
+      }
+      if (!Array.isArray(updated)) {
+        throw new Error('AI response was not an itinerary array.');
+      }
       setItinerary(injectAds(updated));
       sessionStorage.setItem('travelItinerary', JSON.stringify({ title, itinerary: updated }));
     } finally {

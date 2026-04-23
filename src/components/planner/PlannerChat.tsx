@@ -8,6 +8,10 @@ interface Props {
   loading: boolean;
 }
 
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 const QUICK_COMMANDS = [
   'Change lunch to local seafood',
   'Add a coffee break in the afternoon',
@@ -33,8 +37,12 @@ export default function PlannerChat({ onCommand, loading }: Props) {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: cmd }]);
 
-    await onCommand(cmd);
-    setMessages(prev => [...prev, { role: 'ai', text: '✅ Itinerary updated! Scroll up to see the changes.' }]);
+    try {
+      await onCommand(cmd);
+      setMessages(prev => [...prev, { role: 'ai', text: '✅ Itinerary updated! Scroll up to see the changes.' }]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'ai', text: `❌ ${errorMessage(e)}` }]);
+    }
   };
 
   return (
