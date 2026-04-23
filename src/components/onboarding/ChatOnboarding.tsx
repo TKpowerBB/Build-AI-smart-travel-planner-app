@@ -47,7 +47,7 @@ export default function ChatOnboarding() {
       const res = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, profile }),
       });
 
       const json = await res.json();
@@ -68,13 +68,11 @@ export default function ChatOnboarding() {
         throw new Error('AI did not return a valid profile. Please try again.');
       }
 
-      const merged = { ...profile, ...Object.fromEntries(
-        Object.entries(result.profile).filter(([, v]) => v !== null && v !== undefined)
-      )};
+      const merged = result.profile as Partial<TravelProfile>;
       setProfile(merged);
       setMissingFields(result.missingFields || []);
 
-      const remaining = result.missingFields?.filter(f => f in FOLLOW_UP_QUESTIONS) || [];
+      const remaining = (result.missingFields || []).filter(f => f in FOLLOW_UP_QUESTIONS);
 
       if (remaining.length > 0) {
         const nextField = remaining[0];

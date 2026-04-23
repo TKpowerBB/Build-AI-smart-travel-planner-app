@@ -24,6 +24,9 @@ async function tryGenerateContent(prompt: string, systemInstruction: string) {
       const text = response.text ?? '';
       // JSON 블록 추출 (마크다운 펜스 제거)
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      if (!cleaned) {
+        throw new Error(`Model ${model} returned empty response`);
+      }
       return cleaned;
     } catch (e) {
       lastError = e;
