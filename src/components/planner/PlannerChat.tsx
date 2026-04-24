@@ -23,10 +23,18 @@ export default function PlannerChat({ onCommand, loading, lang = 'en' }: Props) 
     { role: 'ai', text: strings.greeting }
   ]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
+
+  // Keep focus in the input: refocus when the panel opens and again
+  // whenever loading finishes (the input is `disabled` during an edit
+  // request, which drops focus).
+  useEffect(() => {
+    if (open && !loading) inputRef.current?.focus();
+  }, [open, loading]);
 
   const handleSend = async (text?: string) => {
     const cmd = (text || input).trim();
@@ -111,6 +119,7 @@ export default function PlannerChat({ onCommand, loading, lang = 'en' }: Props) 
           {/* Input */}
           <div className="px-3 pb-3 flex gap-2">
             <input
+              ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}

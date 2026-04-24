@@ -24,12 +24,23 @@ export default function ChatOnboarding() {
   const [generating, setGenerating] = useState(false);
   const [langState, setLangState] = useState<LangTrackerState>(INITIAL_LANG_STATE);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const strings = t(langState.currentLang);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Return focus to the textarea whenever it becomes enabled again —
+  // covers post-send and post-generation transitions. The textarea is
+  // `disabled` during loading/generating, and a disabled element loses
+  // focus on its own; we put it back as soon as it's interactive.
+  useEffect(() => {
+    if (!loading && !generating) {
+      inputRef.current?.focus();
+    }
+  }, [loading, generating]);
 
   const addMessage = (role: 'ai' | 'user', text: string) => {
     setMessages(prev => [...prev, { role, text }]);
@@ -194,6 +205,8 @@ export default function ChatOnboarding() {
       <div className="bg-white border-t px-4 py-3">
         <div className="flex gap-2 items-end">
           <textarea
+            ref={inputRef}
+            autoFocus
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
