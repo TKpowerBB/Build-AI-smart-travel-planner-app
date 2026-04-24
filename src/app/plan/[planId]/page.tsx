@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { DailyItinerary, TravelProfile } from '@/types';
 import { injectAds } from '@/utils/adInjector';
 import { repairItinerary } from '@/utils/repairItinerary';
+import { detectLanguageCommand } from '@/utils/detectLanguageCommand';
+import { t } from '@/lib/i18n/strings';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
 import PlannerChat from '@/components/planner/PlannerChat';
@@ -34,8 +36,26 @@ export default function SavedPlanPage() {
       .catch(() => router.push('/plans'));
   }, [planId, router]);
 
-  const handleEdit = async (command: string) => {
+  const handleEdit = async (command: string): Promise<void | { confirmation?: string }> => {
     if (!profile) return;
+
+    // UI-language switch: update profile + persist, don't touch itinerary.
+    const targetLang = detectLanguageCommand(command);
+    if (targetLang && targetLang !== profile.language) {
+      const nextProfile = { ...profile, language: targetLang };
+      setProfile(nextProfile);
+      try {
+        await fetch(`/api/plans/${planId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: nextProfile }),
+        });
+      } catch {
+        // Non-fatal — the UI has already switched; a refresh will resync.
+      }
+      return { confirmation: t(targetLang).planner.languageChanged };
+    }
+
     setEditLoading(true);
     try {
       // Strip injected ad cards before sending — they aren't real itinerary data

@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { itinerary, changeNote } = await req.json();
+  const { itinerary, changeNote, profile } = await req.json();
 
   // Get current version for history
   const { data: current } = await supabase
@@ -36,21 +36,35 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (!current) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
 
-  const newVersion = (current.version || 1) + 1;
+  // Profile-only updates (e.g. UI language switch) shouldn't bump version
+  // or create a plan-history entry — that history is for itinerary edits.
+  const isItineraryUpdate = itinerary !== undefined;
+  const newVersion = isItineraryUpdate ? (current.version || 1) + 1 : current.version;
 
-  // Save old version to history
-  await supabase.from('plan_history').insert({
-    plan_id: params.planId,
-    user_id: user.id,
-    version: current.version,
-    itinerary: current.itinerary,
-    change_note: changeNote || 'Updated',
-  });
+  if (isItineraryUpdate) {
+    await supabase.from('plan_history').insert({
+      plan_id: params.planId,
+      user_id: user.id,
+      version: current.version,
+      itinerary: current.itinerary,
+      change_note: changeNote || 'Updated',
+    });
+  }
 
-  // Update plan with new itinerary
+  const update: Record<string, unknown> = {};
+  if (isItineraryUpdate) {
+    update.itinerary = itinerary;
+    update.version = newVersion;
+  }
+  if (profile !== undefined) update.profile = profile;
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('travel_plans')
-    .update({ itinerary, version: newVersion })
+    .update(update)
     .eq('id', params.planId)
     .eq('user_id', user.id)
     .select()

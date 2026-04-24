@@ -24,6 +24,7 @@ export interface UiStrings {
     placeholder: string;
     errorPrefix: string;
     quickCommands: string[];
+    languageChanged: string;
   };
 }
 
@@ -57,6 +58,7 @@ const EN: UiStrings = {
       'Make day 2 more relaxed',
       'Move dinner 1 hour later',
     ],
+    languageChanged: '✅ Switched to English.',
   },
 };
 
@@ -90,6 +92,7 @@ const KO: UiStrings = {
       '2일차를 더 여유롭게',
       '저녁을 1시간 늦추기',
     ],
+    languageChanged: '✅ 한국어로 변경했어요.',
   },
 };
 
@@ -123,6 +126,7 @@ const JA: UiStrings = {
       '2日目をもっとのんびりに',
       '夕食を1時間遅くする',
     ],
+    languageChanged: '✅ 日本語に切り替えました。',
   },
 };
 

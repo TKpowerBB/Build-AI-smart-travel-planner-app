@@ -6,7 +6,10 @@ import { UiLang } from '@/utils/langTracker';
 interface Message { role: 'ai' | 'user'; text: string }
 
 interface Props {
-  onCommand: (cmd: string) => Promise<void>;
+  // Return an optional custom confirmation to show in place of the
+  // default "updated" message (used e.g. when the command was a
+  // language switch rather than an itinerary edit).
+  onCommand: (cmd: string) => Promise<void | { confirmation?: string }>;
   loading: boolean;
   lang?: UiLang;
 }
@@ -43,8 +46,9 @@ export default function PlannerChat({ onCommand, loading, lang = 'en' }: Props) 
     setMessages(prev => [...prev, { role: 'user', text: cmd }]);
 
     try {
-      await onCommand(cmd);
-      setMessages(prev => [...prev, { role: 'ai', text: strings.updated }]);
+      const result = await onCommand(cmd);
+      const confirmation = (result && result.confirmation) || strings.updated;
+      setMessages(prev => [...prev, { role: 'ai', text: confirmation }]);
     } catch (e) {
       setMessages(prev => [...prev, { role: 'ai', text: `${strings.errorPrefix} ${errorMessage(e)}` }]);
     }

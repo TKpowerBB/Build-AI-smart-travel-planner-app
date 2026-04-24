@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { DailyItinerary, TravelProfile, GenerateResult } from '@/types';
 import { injectAds } from '@/utils/adInjector';
 import { repairItinerary } from '@/utils/repairItinerary';
+import { detectLanguageCommand } from '@/utils/detectLanguageCommand';
+import { t } from '@/lib/i18n/strings';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
 import PlannerChat from '@/components/planner/PlannerChat';
@@ -37,8 +39,19 @@ export default function NewPlanPage() {
     }
   }, [router]);
 
-  const handleEdit = async (command: string) => {
+  const handleEdit = async (command: string): Promise<void | { confirmation?: string }> => {
     if (!profile) return;
+
+    // Intercept UI-language switch requests before hitting the edit API —
+    // they don't change the itinerary, just the profile + UI strings.
+    const targetLang = detectLanguageCommand(command);
+    if (targetLang && targetLang !== profile.language) {
+      const nextProfile = { ...profile, language: targetLang };
+      setProfile(nextProfile);
+      sessionStorage.setItem('travelProfile', JSON.stringify(nextProfile));
+      return { confirmation: t(targetLang).planner.languageChanged };
+    }
+
     setEditLoading(true);
     try {
       // Strip injected ad cards before sending — they aren't real itinerary data
