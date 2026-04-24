@@ -42,18 +42,21 @@ export default function NewPlanPage() {
   const handleEdit = async (command: string): Promise<void | { confirmation?: string }> => {
     if (!profile) return;
 
-    // Intercept UI-language switch requests before hitting the edit API —
-    // they don't change the itinerary, just the profile + UI strings.
-    const targetLang = detectLanguageCommand(command);
-    if (targetLang && targetLang !== profile.language) {
-      const nextProfile = { ...profile, language: targetLang };
-      setProfile(nextProfile);
-      sessionStorage.setItem('travelProfile', JSON.stringify(nextProfile));
-      return { confirmation: t(targetLang).planner.languageChanged };
-    }
-
+    // Show the typing indicator during intent detection too — the AI
+    // fallback in detectLanguageCommand can add ~500ms and we don't
+    // want dead air in the chat.
     setEditLoading(true);
     try {
+      // Intercept UI-language switch requests before hitting the edit API —
+      // they don't change the itinerary, just the profile + UI strings.
+      const targetLang = await detectLanguageCommand(command);
+      if (targetLang && targetLang !== profile.language) {
+        const nextProfile = { ...profile, language: targetLang };
+        setProfile(nextProfile);
+        sessionStorage.setItem('travelProfile', JSON.stringify(nextProfile));
+        return { confirmation: t(targetLang).planner.languageChanged };
+      }
+
       // Strip injected ad cards before sending — they aren't real itinerary data
       const clean = itinerary
         .map((day) => ({

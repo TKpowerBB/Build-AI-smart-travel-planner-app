@@ -39,25 +39,28 @@ export default function SavedPlanPage() {
   const handleEdit = async (command: string): Promise<void | { confirmation?: string }> => {
     if (!profile) return;
 
-    // UI-language switch: update profile + persist, don't touch itinerary.
-    const targetLang = detectLanguageCommand(command);
-    if (targetLang && targetLang !== profile.language) {
-      const nextProfile = { ...profile, language: targetLang };
-      setProfile(nextProfile);
-      try {
-        await fetch(`/api/plans/${planId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile: nextProfile }),
-        });
-      } catch {
-        // Non-fatal — the UI has already switched; a refresh will resync.
-      }
-      return { confirmation: t(targetLang).planner.languageChanged };
-    }
-
+    // Show the typing indicator during intent detection too — the AI
+    // fallback in detectLanguageCommand can add ~500ms and we don't
+    // want dead air in the chat.
     setEditLoading(true);
     try {
+      // UI-language switch: update profile + persist, don't touch itinerary.
+      const targetLang = await detectLanguageCommand(command);
+      if (targetLang && targetLang !== profile.language) {
+        const nextProfile = { ...profile, language: targetLang };
+        setProfile(nextProfile);
+        try {
+          await fetch(`/api/plans/${planId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: nextProfile }),
+          });
+        } catch {
+          // Non-fatal — the UI has already switched; a refresh will resync.
+        }
+        return { confirmation: t(targetLang).planner.languageChanged };
+      }
+
       // Strip injected ad cards before sending — they aren't real itinerary data
       const clean = itinerary.map((day) => ({
         ...day,
