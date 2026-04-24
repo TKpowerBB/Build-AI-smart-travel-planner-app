@@ -1,29 +1,26 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { t } from '@/lib/i18n/strings';
+import { UiLang } from '@/utils/langTracker';
 
 interface Message { role: 'ai' | 'user'; text: string }
 
 interface Props {
   onCommand: (cmd: string) => Promise<void>;
   loading: boolean;
+  lang?: UiLang;
 }
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-const QUICK_COMMANDS = [
-  'Change lunch to local seafood',
-  'Add a coffee break in the afternoon',
-  'Make day 2 more relaxed',
-  'Move dinner 1 hour later',
-];
-
-export default function PlannerChat({ onCommand, loading }: Props) {
+export default function PlannerChat({ onCommand, loading, lang = 'en' }: Props) {
+  const strings = t(lang).planner;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', text: 'Need to change your itinerary? Just tell me what you\'d like to adjust! 💬' }
+    { role: 'ai', text: strings.greeting }
   ]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -39,9 +36,9 @@ export default function PlannerChat({ onCommand, loading }: Props) {
 
     try {
       await onCommand(cmd);
-      setMessages(prev => [...prev, { role: 'ai', text: '✅ Itinerary updated! Scroll up to see the changes.' }]);
+      setMessages(prev => [...prev, { role: 'ai', text: strings.updated }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: 'ai', text: `❌ ${errorMessage(e)}` }]);
+      setMessages(prev => [...prev, { role: 'ai', text: `${strings.errorPrefix} ${errorMessage(e)}` }]);
     }
   };
 
@@ -67,7 +64,7 @@ export default function PlannerChat({ onCommand, loading }: Props) {
       {open && (
         <div className="fixed bottom-24 right-4 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 flex flex-col max-h-96">
           <div className="px-4 py-3 border-b bg-indigo-50 rounded-t-2xl">
-            <p className="text-sm font-semibold text-indigo-800">Modify Itinerary</p>
+            <p className="text-sm font-semibold text-indigo-800">{strings.header}</p>
           </div>
 
           {/* Messages */}
@@ -99,7 +96,7 @@ export default function PlannerChat({ onCommand, loading }: Props) {
 
           {/* Quick commands */}
           <div className="px-3 pb-2 flex gap-1.5 overflow-x-auto scrollbar-hide">
-            {QUICK_COMMANDS.map((cmd, i) => (
+            {strings.quickCommands.map((cmd, i) => (
               <button
                 key={i}
                 onClick={() => handleSend(cmd)}
@@ -117,7 +114,7 @@ export default function PlannerChat({ onCommand, loading }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="e.g. Add beach time on day 3"
+              placeholder={strings.placeholder}
               className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               disabled={loading}
             />

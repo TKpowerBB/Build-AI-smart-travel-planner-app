@@ -3,31 +3,29 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TravelProfile, ExtractResult, DailyItinerary } from '@/types';
 import { repairItinerary } from '@/utils/repairItinerary';
+import { advanceLang, INITIAL_LANG_STATE, LangTrackerState } from '@/utils/langTracker';
+import { t } from '@/lib/i18n/strings';
 import ChatBubble from './ChatBubble';
 
 type Message = { role: 'ai' | 'user'; text: string };
 
-const FOLLOW_UP_QUESTIONS: Record<string, string> = {
-  destination: "Where would you like to travel? 🌍",
-  startDate: "When does your trip start? (e.g. 2026-06-01)",
-  endDate: "When does it end? (max 15 days)",
-  totalPeople: "How many people are traveling?",
-  companions: "Tell me about your travel companions — their ages, gender, and what they enjoy (e.g. '32F who loves food, 35M who prefers hiking')",
-  travelStyle: "What's your travel style? (e.g. relaxed, adventure, foodie, luxury)",
-  flightDepartureTime: "Do you have a departure flight time? (e.g. 09:00, or skip)",
-};
-
 export default function ChatOnboarding() {
   const router = useRouter();
+  // Initial greeting is intentionally English — product decision: pre-login
+  // users see English first. Language flips only after 5 consecutive
+  // non-English user messages (see langTracker.ts).
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', text: "Hi! I'm your AI travel planner 🗺️\n\nTell me about your dream trip — destination, dates, who you're traveling with, and what you enjoy. The more you share, the better your itinerary!" }
   ]);
   const [input, setInput] = useState('');
   const [profile, setProfile] = useState<Partial<TravelProfile>>({});
-  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [, setMissingFields] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [langState, setLangState] = useState<LangTrackerState>(INITIAL_LANG_STATE);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const strings = t(langState.currentLang);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,6 +40,12 @@ export default function ChatOnboarding() {
     if (!text || loading) return;
     setInput('');
     addMessage('user', text);
+    // Update language tracker BEFORE we derive strings for follow-ups.
+    // If this message pushes the streak past the threshold, the next AI
+    // follow-up will already be in the new language.
+    const nextLangState = advanceLang(langState, text);
+    setLangState(nextLangState);
+    const nextStrings = t(nextLangState.currentLang);
     setLoading(true);
 
     try {
@@ -60,38 +64,41 @@ export default function ChatOnboarding() {
       const result = json as ExtractResult;
 
       if (result.error === 'TRIP_TOO_LONG') {
-        addMessage('ai', "⚠️ That's more than 15 days! Please shorten your trip to a maximum of 15 days.");
+        addMessage('ai', nextStrings.tripTooLong);
         setLoading(false);
         return;
       }
 
       if (!result.profile) {
-        throw new Error('AI did not return a valid profile. Please try again.');
+        throw new Error(nextStrings.invalidProfile);
       }
 
       const merged = result.profile as Partial<TravelProfile>;
       setProfile(merged);
       setMissingFields(result.missingFields || []);
 
-      const remaining = (result.missingFields || []).filter(f => f in FOLLOW_UP_QUESTIONS);
+      const followUpKeys = Object.keys(nextStrings.followUp);
+      const remaining = (result.missingFields || []).filter((f) => followUpKeys.includes(f));
 
       if (remaining.length > 0) {
-        const nextField = remaining[0];
-        addMessage('ai', FOLLOW_UP_QUESTIONS[nextField]);
+        const nextField = remaining[0] as keyof typeof nextStrings.followUp;
+        addMessage('ai', nextStrings.followUp[nextField]);
       } else {
-        // All info collected — start generation
-        await startGeneration(merged as TravelProfile);
+        // All info collected — pin the UI language into the profile so the
+        // generated itinerary matches the user's conversation language.
+        const finalProfile = { ...merged, language: nextLangState.currentLang } as TravelProfile;
+        await startGeneration(finalProfile, nextStrings);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      addMessage('ai', `❌ Error: ${msg}`);
+      addMessage('ai', nextStrings.genericError(msg));
     }
     setLoading(false);
   };
 
-  const startGeneration = async (finalProfile: TravelProfile) => {
+  const startGeneration = async (finalProfile: TravelProfile, localStrings = strings) => {
     setGenerating(true);
-    addMessage('ai', "✨ Perfect! I have everything I need. Generating your personalized itinerary...\n\nThis may take 15-20 seconds.");
+    addMessage('ai', localStrings.generating);
 
     // Store profile for the plan page
     sessionStorage.setItem('travelProfile', JSON.stringify(finalProfile));
@@ -139,7 +146,8 @@ export default function ChatOnboarding() {
       sessionStorage.setItem('travelItinerary', JSON.stringify(parsed));
       router.push('/plan/new');
     } catch (e: unknown) {
-      addMessage('ai', `❌ Generation failed: ${e instanceof Error ? e.message : 'Unknown error'}. Please try again.`);
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      addMessage('ai', localStrings.generationFailed(msg));
       setGenerating(false);
     }
   };
@@ -189,7 +197,7 @@ export default function ChatOnboarding() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Tell me about your trip..."
+            placeholder={strings.inputPlaceholder}
             className="flex-1 resize-none border border-gray-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 max-h-32"
             rows={1}
             disabled={loading || generating}

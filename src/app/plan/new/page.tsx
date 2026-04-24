@@ -144,7 +144,7 @@ export default function NewPlanPage() {
 
       <DayTabs days={itinerary} selected={selectedDay} onChange={setSelectedDay} />
       <DayView day={itinerary[selectedDay]} companions={profile.companions} />
-      <PlannerChat onCommand={handleEdit} loading={editLoading} />
+      <PlannerChat onCommand={handleEdit} loading={editLoading} lang={(profile.language as 'en' | 'ko' | 'ja') || 'en'} />
     </div>
   );
 }
