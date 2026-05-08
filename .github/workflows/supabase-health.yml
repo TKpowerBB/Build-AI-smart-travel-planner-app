@@ -1,0 +1,15 @@
+name: Supabase Health Ping
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase health endpoint
+        run: |
+          curl --fail --show-error --silent --max-time 20 \
+            https://build-ai-smart-travel-planner-app.vercel.app/api/health/supabase
