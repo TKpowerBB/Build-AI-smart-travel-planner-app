@@ -2,11 +2,9 @@
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -43,17 +41,24 @@ export default function LoginPage() {
     setError('');
     setSuggestSignIn(false);
 
-    const fn = mode === 'login'
-      ? supabase.auth.signInWithPassword({ email, password })
-      : supabase.auth.signUp({ email, password });
+    try {
+      const res = await fetch(`/api/auth/${mode === 'login' ? 'login' : 'signup'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
 
-    const { error } = await fn;
-    if (error) {
-      const { text, suggest } = interpretError(error.message, mode);
+      if (!res.ok) {
+        throw new Error(data.error || `Authentication failed (${res.status})`);
+      }
+
+      router.push(mode === 'signup' ? '/onboarding' : '/plans');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : 'Authentication failed';
+      const { text, suggest } = interpretError(raw, mode);
       setError(text);
       setSuggestSignIn(suggest);
-    } else {
-      router.push(mode === 'signup' ? '/onboarding' : '/plans');
     }
     setLoading(false);
   };
