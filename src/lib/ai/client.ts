@@ -12,18 +12,77 @@ const MODELS = [
   'gemini-2.0-flash-lite',
 ];
 
-async function tryGenerateContent(prompt: string, systemInstruction: string) {
+function cleanModelText(text: string): string {
+  return text
+    .replace(/^\uFEFF/, '')
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+}
+
+function extractJsonPayload(text: string): string {
+  const cleaned = cleanModelText(text);
+  const start = cleaned.search(/[\[{]/);
+  if (start === -1) return cleaned;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  const opener = cleaned[start];
+  const closer = opener === '{' ? '}' : ']';
+
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (ch === opener) depth += 1;
+    if (ch === closer) depth -= 1;
+    if (depth === 0) return cleaned.slice(start, i + 1);
+  }
+
+  return cleaned.slice(start);
+}
+
+function parseModelJSON<T>(text: string): T {
+  const cleaned = cleanModelText(text);
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    return JSON.parse(extractJsonPayload(cleaned)) as T;
+  }
+}
+
+async function tryGenerateContent(
+  prompt: string,
+  systemInstruction: string,
+  options: { json?: boolean } = {}
+) {
   let lastError: unknown;
   for (const model of MODELS) {
     try {
       const response = await ai.models.generateContent({
         model,
         contents: prompt,
-        config: { systemInstruction },
+        config: {
+          systemInstruction,
+          ...(options.json ? { responseMimeType: 'application/json', temperature: 0 } : {}),
+        },
       });
       const text = response.text ?? '';
-      // JSON 블록 추출 (마크다운 펜스 제거)
-      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleaned = cleanModelText(text);
       if (!cleaned) {
         throw new Error(`Model ${model} returned empty response`);
       }
@@ -77,8 +136,8 @@ export async function generateJSON<T>(
   systemInstruction: string,
   userPrompt: string
 ): Promise<T> {
-  const text = await tryGenerateContent(userPrompt, systemInstruction);
-  return JSON.parse(text) as T;
+  const text = await tryGenerateContent(userPrompt, systemInstruction, { json: true });
+  return parseModelJSON<T>(text);
 }
 
 // 일정 수정 (스트리밍)

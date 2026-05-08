@@ -45,15 +45,21 @@ fixed_point card:
 { "type": "fixed_point", "subtype": "trip_start"|"trip_end", "title": "", "location": "", "lat": 0.0, "lng": 0.0, "time": "HH:MM", "duration": 60 }
 
 activity card:
-{ "type": "activity", "subtype": "experience"|"rest"|"meal"|"place", "title": "", "desc": "", "location": "", "lat": 0.0, "lng": 0.0, "time": "HH:MM", "duration": 90, "weatherHint": "Sunny, avg 24°C" }
+{ "type": "activity", "subtype": "experience"|"rest"|"meal"|"place", "emoji": "🍣", "title": "", "desc": "", "location": "", "address": "full street address", "lat": 0.0, "lng": 0.0, "time": "HH:MM", "duration": 90, "startTime": "HH:MM", "endTime": "HH:MM", "weatherHint": "Sunny, avg 24°C", "aiNote": "1-2 sentence tip from the planner", "status": "planned" }
 
 transit card:
-{ "type": "transit", "from": "", "fromLat": 0.0, "fromLng": 0.0, "to": "", "toLat": 0.0, "toLng": 0.0, "mode": "taxi"|"walk"|"bus"|"subway"|"car"|"boat"|"plane", "time": "HH:MM", "duration": 30 }
+{ "type": "transit", "emoji": "🚇", "title": "Subway to ...", "from": "", "fromAddress": "", "fromLat": 0.0, "fromLng": 0.0, "to": "", "toAddress": "", "toLat": 0.0, "toLng": 0.0, "mode": "taxi"|"walk"|"bus"|"subway"|"car"|"boat"|"plane", "time": "HH:MM", "duration": 30, "startTime": "HH:MM", "endTime": "HH:MM", "aiNote": "", "status": "planned" }
 
 RULES:
 - Each day: 6-10 cards (mix of activity + transit, day 1 starts with fixed_point, last day ends with fixed_point)
 - All times must be sequential within a day (no overlap)
-- Use realistic travel durations between locations
-- Tailor activities to companion ages, genders, and preferences
-- Every transit card MUST include ALL SIX coordinate fields (from, fromLat, fromLng, to, toLat, toLng). None may be null, omitted, or set to 0 unless the location is truly on the equator/prime meridian. The fromLat/fromLng MUST match the preceding card's coordinates, and toLat/toLng MUST match the following card's coordinates.`;
+- startTime MUST equal time. endTime MUST equal time + duration (HH:MM, 24h).
+- emoji: a single most-fitting emoji for the activity / mode of transport.
+- address: full postal address when known (street, city, country). For activity cards this is required if available; for transit cards include fromAddress/toAddress.
+- aiNote: a short helpful tip in the user's language (e.g. "Reservations recommended on weekends.").
+- status: always "planned" on first generation.
+- Use realistic travel durations between locations.
+- Tailor activities to companion ages, genders, preferences, and the trip goal (travelStyle) + notes from the profile.
+- Every transit card MUST include ALL SIX coordinate fields (from, fromLat, fromLng, to, toLat, toLng). None may be null, omitted, or set to 0 unless the location is truly on the equator/prime meridian. The fromLat/fromLng MUST match the preceding card's coordinates, and toLat/toLng MUST match the following card's coordinates.
+- Every activity card's location/address MUST belong to the destination region in the profile. If a venue is outside that region, choose a closer alternative.`;
 }

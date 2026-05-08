@@ -1,4 +1,53 @@
-import { DailyItinerary, ItineraryCard, TransitCard } from '@/types';
+import { ActivityCard, DailyItinerary, ItineraryCard, TransitCard } from '@/types';
+
+/** Add `minutes` to a "HH:MM" string and return "HH:MM" (24h). Wraps within day. */
+function addMinutes(time: string | undefined, minutes: number | undefined): string | undefined {
+  if (!time || typeof minutes !== 'number') return undefined;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time);
+  if (!m) return undefined;
+  const total = (parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + minutes) % (24 * 60);
+  const hh = Math.floor(total / 60).toString().padStart(2, '0');
+  const mm = (total % 60).toString().padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/** Default subtype emojis for activity cards when the LLM omits one. */
+const ACTIVITY_EMOJI: Record<string, string> = {
+  experience: '🎯', rest: '😴', meal: '🍽️', place: '📍',
+};
+const TRANSIT_EMOJI: Record<string, string> = {
+  walk: '🚶', taxi: '🚕', bus: '🚌', subway: '🚇',
+  car: '🚗', boat: '⛴️', plane: '✈️',
+};
+
+/**
+ * Pipeline step 3: cross-check that each card's location belongs to the
+ * trip destination. We only emit a console warning here — the LLM has
+ * already been instructed to constrain locations, and we don't want to
+ * silently mutate text the user will see.
+ */
+export function crossCheckDestination(days: DailyItinerary[], destination: string): void {
+  if (!destination) return;
+  const tokens = destination
+    .toLowerCase()
+    .split(/[\s,/]+/)
+    .filter((t) => t.length > 1);
+  if (tokens.length === 0) return;
+  const matchesDestination = (text: string | undefined) => {
+    if (!text) return true; // missing location → can't disprove
+    const lower = text.toLowerCase();
+    return tokens.some((t) => lower.includes(t));
+  };
+  for (const day of days) {
+    for (const c of day.cards) {
+      if (c.type === 'activity') {
+        if (!matchesDestination(c.address) && !matchesDestination(c.location)) {
+          console.warn(`[crossCheck] activity "${c.title}" location "${c.location}" may be outside ${destination}`);
+        }
+      }
+    }
+  }
+}
 
 /**
  * Defensively fill missing transit-card coordinates by borrowing from
@@ -15,14 +64,31 @@ import { DailyItinerary, ItineraryCard, TransitCard } from '@/types';
 export function repairItinerary(days: DailyItinerary[]): DailyItinerary[] {
   return days.map((day) => ({
     ...day,
-    cards: repairDayCards(day.cards),
+    cards: repairDayCards(day.cards, day.date),
   }));
 }
 
-function repairDayCards(cards: ItineraryCard[]): ItineraryCard[] {
+function repairDayCards(cards: ItineraryCard[], dayDate: string): ItineraryCard[] {
   const out = cards.map((c) => ({ ...c }));
   for (let i = 0; i < out.length; i++) {
     const card = out[i];
+
+    // Default the new CardMeta fields (status, emoji, start/end times, dates).
+    // We only fill blanks — never overwrite values the LLM produced.
+    if (card.type === 'activity' || card.type === 'transit') {
+      const m = card;
+      if (!m.status) m.status = 'planned';
+      if (!m.startDate) m.startDate = dayDate;
+      if (!m.endDate) m.endDate = dayDate;
+      if (!m.startTime && m.time) m.startTime = m.time;
+      if (!m.endTime && m.time) m.endTime = addMinutes(m.time, m.duration);
+      if (!m.emoji) {
+        m.emoji = card.type === 'activity'
+          ? ACTIVITY_EMOJI[card.subtype]
+          : TRANSIT_EMOJI[card.mode];
+      }
+    }
+
     if (card.type !== 'transit') continue;
     const t = card as TransitCard;
 
@@ -74,11 +140,7 @@ function findCoordNeighbour(
       continue;
     }
     // activity or fixed_point
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lat = (c as any).lat;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lng = (c as any).lng;
-    if (isValidCoord(lat) && isValidCoord(lng)) return { lat, lng };
+    if (isValidCoord(c.lat) && isValidCoord(c.lng)) return { lat: c.lat, lng: c.lng };
   }
   return null;
 }

@@ -19,14 +19,36 @@ export interface CardParticipants {
 
 export interface TravelProfile {
   destination: string;
-  startDate: string;                   // "YYYY-MM-DD"
+  startDate: string;                   // "YYYY-MM-DD" — projectStart date
+  startTime?: string;                  // "HH:MM" — projectStart time
   endDate: string;                     // "YYYY-MM-DD" — max 15 days from startDate
+  endTime?: string;                    // "HH:MM" — projectEnd time
   flightDepartureTime?: string;        // "HH:MM"
   flightArrivalTime?: string;          // "HH:MM"
   totalPeople: number;
   companions: Companion[];
-  travelStyle?: string;
+  travelStyle?: string;                // 프로젝트목표 (trip goal)
+  notes?: string;                      // 참고사항 (free-form notes)
   language?: string;                   // 'ko' | 'en' | 'ja' ... default: 'en'
+}
+
+// ─── Card meta — shared optional fields ──────────────────────────────────────
+// Captured on every activity / transit card for richer UI + later editing.
+
+export type CardStatus = 'planned' | 'done' | 'skipped';
+
+export interface CardMeta {
+  emoji?: string;          // 이모티콘
+  startDate?: string;      // "YYYY-MM-DD" (defaults to day.date)
+  startTime?: string;      // "HH:MM"      (defaults to card.time)
+  endDate?: string;        // "YYYY-MM-DD"
+  endTime?: string;        // "HH:MM"      (start + duration)
+  temperature?: number;    // °C — populated by weather pipeline
+  humidity?: number;       // % — populated by weather pipeline
+  weather?: string;        // short label e.g. "Sunny", "Rain"
+  aiNote?: string;         // AI메모
+  userNote?: string;       // 나의메모
+  status?: CardStatus;     // 현황 — defaults 'planned'
 }
 
 // ─── Cards ───────────────────────────────────────────────────────────────────
@@ -42,26 +64,30 @@ export interface FixedPointCard {
   duration: number;
 }
 
-export interface ActivityCard {
+export interface ActivityCard extends CardMeta {
   type: 'activity';
   subtype: 'experience' | 'rest' | 'meal' | 'place';
   title: string;
   desc: string;
   location: string;
+  address?: string;        // 주소 — full street address
   lat: number;
   lng: number;
   time: string;
   duration: number;
-  weatherHint?: string;
+  weatherHint?: string;    // legacy seasonal hint, kept for back-compat
   participants?: CardParticipants;  // undefined = all companions (default)
 }
 
-export interface TransitCard {
+export interface TransitCard extends CardMeta {
   type: 'transit';
+  title?: string;          // optional human label e.g. "Subway to Shibuya"
   from: string;
+  fromAddress?: string;    // 출발주소
   fromLat: number;
   fromLng: number;
   to: string;
+  toAddress?: string;      // 도착주소
   toLat: number;
   toLng: number;
   mode: 'walk' | 'taxi' | 'bus' | 'subway' | 'car' | 'boat' | 'plane';
