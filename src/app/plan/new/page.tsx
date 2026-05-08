@@ -6,6 +6,7 @@ import { DailyItinerary, TravelProfile, GenerateResult } from '@/types';
 import { injectAds } from '@/utils/adInjector';
 import { repairItinerary } from '@/utils/repairItinerary';
 import { detectLanguageCommand } from '@/utils/detectLanguageCommand';
+import { parseModelJSON } from '@/utils/json';
 import { t } from '@/lib/i18n/strings';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
@@ -89,10 +90,9 @@ export default function NewPlanPage() {
         if (done) break;
         text += decoder.decode(value, { stream: true });
       }
-      const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
       let updated: DailyItinerary[];
       try {
-        updated = JSON.parse(cleaned);
+        updated = parseModelJSON(text);
       } catch {
         throw new Error('AI returned invalid JSON. Please try again.');
       }

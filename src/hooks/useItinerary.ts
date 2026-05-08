@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { DailyItinerary, GenerateResult, TravelProfile } from '@/types';
 import { injectAds } from '@/utils/adInjector';
+import { parseModelJSON } from '@/utils/json';
 
 async function consumeStream(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader();
@@ -38,7 +39,7 @@ export function useItinerary() {
       }
 
       const text = await consumeStream(res.body!);
-      const result: GenerateResult = JSON.parse(text);
+      const result: GenerateResult = parseModelJSON(text);
       setTitle(result.title);
       setItinerary(injectAds(result.itinerary));
     } catch (e: unknown) {
@@ -64,7 +65,7 @@ export function useItinerary() {
       }
 
       const text = await consumeStream(res.body!);
-      const updated: DailyItinerary[] = JSON.parse(text);
+      const updated: DailyItinerary[] = parseModelJSON(text);
       setItinerary(injectAds(updated));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unknown error');

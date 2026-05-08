@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { SYSTEM_PROMPT } from './prompts/itinerary';
+import { cleanModelText, parseModelJSON } from '@/utils/json';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -11,59 +12,6 @@ const MODELS = [
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
 ];
-
-function cleanModelText(text: string): string {
-  return text
-    .replace(/^\uFEFF/, '')
-    .replace(/```json\s*/gi, '')
-    .replace(/```\s*/g, '')
-    .trim();
-}
-
-function extractJsonPayload(text: string): string {
-  const cleaned = cleanModelText(text);
-  const start = cleaned.search(/[\[{]/);
-  if (start === -1) return cleaned;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  const opener = cleaned[start];
-  const closer = opener === '{' ? '}' : ']';
-
-  for (let i = start; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaped = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (ch === opener) depth += 1;
-    if (ch === closer) depth -= 1;
-    if (depth === 0) return cleaned.slice(start, i + 1);
-  }
-
-  return cleaned.slice(start);
-}
-
-function parseModelJSON<T>(text: string): T {
-  const cleaned = cleanModelText(text);
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    return JSON.parse(extractJsonPayload(cleaned)) as T;
-  }
-}
 
 async function tryGenerateContent(
   prompt: string,
@@ -102,7 +50,12 @@ async function tryGenerateStream(prompt: string, systemInstruction: string): Pro
       const response = await ai.models.generateContentStream({
         model,
         contents: prompt,
-        config: { systemInstruction },
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          temperature: 0,
+          maxOutputTokens: 65536,
+        },
       });
       const encoder = new TextEncoder();
       return new ReadableStream({

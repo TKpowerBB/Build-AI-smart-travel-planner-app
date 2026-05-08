@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TravelProfile, ExtractResult, DailyItinerary } from '@/types';
 import { repairItinerary } from '@/utils/repairItinerary';
+import { parseModelJSON } from '@/utils/json';
 import { advanceLang, INITIAL_LANG_STATE, LangTrackerState } from '@/utils/langTracker';
 import { t } from '@/lib/i18n/strings';
 import ChatBubble from './ChatBubble';
@@ -135,17 +136,11 @@ export default function ChatOnboarding() {
         jsonText += decoder.decode(value, { stream: true });
       }
 
-      // Strip markdown fences that the streaming model may emit
-      const cleaned = jsonText
-        .replace(/```json\s*/gi, '')
-        .replace(/```\s*/g, '')
-        .trim();
-
       // Validate before navigating so a parse failure surfaces as a chat error
       // instead of silently bouncing back to /onboarding
       let parsed: { title: string; itinerary: DailyItinerary[] };
       try {
-        parsed = JSON.parse(cleaned);
+        parsed = parseModelJSON(jsonText);
       } catch {
         throw new Error('AI returned invalid itinerary JSON. Please try again.');
       }
