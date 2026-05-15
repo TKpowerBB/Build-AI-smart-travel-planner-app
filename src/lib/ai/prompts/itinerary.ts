@@ -14,6 +14,7 @@ Rules:
 export function buildGeneratePrompt(profile: TravelProfile): string {
   const days = getTripDays(profile.startDate, profile.endDate);
   const lang = profile.language || 'en';
+  const constraintRules = buildConstraintRules(profile);
 
   return `Generate a ${days}-day travel itinerary in JSON format.
 
@@ -21,6 +22,8 @@ Language for all text fields: ${lang}
 
 TRAVELER PROFILE:
 ${JSON.stringify(profile, null, 2)}
+
+${constraintRules}
 
 OUTPUT SCHEMA (return exactly this JSON structure, no other text):
 {
@@ -62,4 +65,46 @@ RULES:
 - Tailor activities to companion ages, genders, preferences, and the trip goal (travelStyle) + notes from the profile.
 - Every transit card MUST include ALL SIX coordinate fields (from, fromLat, fromLng, to, toLat, toLng). None may be null, omitted, or set to 0 unless the location is truly on the equator/prime meridian. The fromLat/fromLng MUST match the preceding card's coordinates, and toLat/toLng MUST match the following card's coordinates.
 - Every activity card's location/address MUST belong to the destination region in the profile. If a venue is outside that region, choose a closer alternative.`;
+}
+
+function buildConstraintRules(profile: TravelProfile): string {
+  const constraints = profile.travelConstraints;
+  if (!constraints) return '';
+
+  const rules: string[] = [
+    'TRAVEL STYLE CONSTRAINTS:',
+    `- Strictness: ${constraints.strictness}. Treat "hard" constraints as mandatory, not suggestions.`,
+    `- styleTags: ${constraints.styleTags.join(', ') || 'none'}`,
+    `- avoidTags: ${constraints.avoidTags.join(', ') || 'none'}`,
+    `- preferTags: ${constraints.preferTags.join(', ') || 'none'}`,
+  ];
+
+  const styleTags = new Set(constraints.styleTags);
+  const avoidTags = new Set(constraints.avoidTags);
+  const preferTags = new Set(constraints.preferTags);
+
+  if (styleTags.has('local_hidden') || styleTags.has('non_touristy')) {
+    rules.push(
+      '- For local_hidden/non_touristy style, avoid famous tourist attractions unless the user explicitly requested them.',
+      '- Do not include top-10 attractions, iconic landmarks, standard tour routes, landmark viewpoints, or tourist-only restaurants.',
+      '- Prefer ordinary neighborhoods, resident-used markets, small local eateries, residential walking routes, small parks, community spaces, independent shops, and non-landmark places.',
+      '- Each activity aiNote MUST explain why the place fits a local/non-touristy style.',
+      '- If a popular landmark would normally be recommended, replace it with a nearby local alternative.'
+    );
+  }
+
+  if (avoidTags.has('crowds')) {
+    rules.push('- Avoid crowded peak-time venues and schedule quieter times or alternatives.');
+  }
+  if (avoidTags.has('long_transits')) {
+    rules.push('- Keep travel clusters compact; avoid long cross-city transfers unless necessary.');
+  }
+  if (avoidTags.has('tight_schedule') || preferTags.has('slow_pacing')) {
+    rules.push('- Use relaxed pacing with buffers between activities.');
+  }
+  if (preferTags.has('local_eateries')) {
+    rules.push('- Prefer specific local eateries or food streets over generic restaurants or tourist dining zones.');
+  }
+
+  return rules.join('\n');
 }

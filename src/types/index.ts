@@ -28,8 +28,48 @@ export interface TravelProfile {
   totalPeople: number;
   companions: Companion[];
   travelStyle?: string;                // 프로젝트목표 (trip goal)
+  travelConstraints?: TravelConstraints; // structured style constraints inferred from travelStyle/notes
   notes?: string;                      // 참고사항 (free-form notes)
   language?: string;                   // 'ko' | 'en' | 'ja' ... default: 'en'
+}
+
+export type TravelStyleTag =
+  | 'local_hidden'
+  | 'non_touristy'
+  | 'foodie'
+  | 'relaxed'
+  | 'adventure'
+  | 'family'
+  | 'luxury'
+  | 'nature'
+  | 'culture'
+  | 'shopping'
+  | 'nightlife';
+
+export type TravelAvoidTag =
+  | 'famous_landmarks'
+  | 'top_attractions'
+  | 'standard_tour_routes'
+  | 'crowds'
+  | 'tourist_restaurants'
+  | 'long_transits'
+  | 'tight_schedule';
+
+export type TravelPreferTag =
+  | 'neighborhood_markets'
+  | 'local_eateries'
+  | 'residential_walks'
+  | 'small_parks'
+  | 'community_spaces'
+  | 'independent_shops'
+  | 'ordinary_local_places'
+  | 'slow_pacing';
+
+export interface TravelConstraints {
+  styleTags: TravelStyleTag[];
+  avoidTags: TravelAvoidTag[];
+  preferTags: TravelPreferTag[];
+  strictness: 'soft' | 'medium' | 'hard';
 }
 
 // ─── Card meta — shared optional fields ──────────────────────────────────────
