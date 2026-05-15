@@ -4,17 +4,17 @@ import { useRouter } from 'next/navigation';
 import { TravelProfile, ExtractResult, DailyItinerary } from '@/types';
 import { repairItinerary } from '@/utils/repairItinerary';
 import { parseModelJSON } from '@/utils/json';
-import { advanceLang, INITIAL_LANG_STATE, LangTrackerState } from '@/utils/langTracker';
+import { UiLang } from '@/utils/langTracker';
 import { t } from '@/lib/i18n/strings';
+import { useAuth } from '@/hooks/useAuth';
+import LanguageSelect from '@/components/LanguageSelect';
 import ChatBubble from './ChatBubble';
 
 type Message = { role: 'ai' | 'user'; text: string };
 
 export default function ChatOnboarding() {
   const router = useRouter();
-  // Initial greeting is intentionally English — product decision: pre-login
-  // users see English first. Language flips only after 5 consecutive
-  // non-English user messages (see langTracker.ts).
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', text: "Hi! I'm your AI travel planner 🗺️\n\nTell me about your dream trip — destination, dates, who you're traveling with, and what you enjoy. The more you share, the better your itinerary!" }
   ]);
@@ -23,11 +23,11 @@ export default function ChatOnboarding() {
   const [, setMissingFields] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [langState, setLangState] = useState<LangTrackerState>(INITIAL_LANG_STATE);
+  const [lang, setLang] = useState<UiLang>('en');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const strings = t(langState.currentLang);
+  const strings = t(lang);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,12 +52,7 @@ export default function ChatOnboarding() {
     if (!text || loading) return;
     setInput('');
     addMessage('user', text);
-    // Update language tracker BEFORE we derive strings for follow-ups.
-    // If this message pushes the streak past the threshold, the next AI
-    // follow-up will already be in the new language.
-    const nextLangState = advanceLang(langState, text);
-    setLangState(nextLangState);
-    const nextStrings = t(nextLangState.currentLang);
+    const nextStrings = t(lang);
     setLoading(true);
 
     try {
@@ -98,7 +93,7 @@ export default function ChatOnboarding() {
       } else {
         // All info collected — pin the UI language into the profile so the
         // generated itinerary matches the user's conversation language.
-        const finalProfile = { ...merged, language: nextLangState.currentLang } as TravelProfile;
+        const finalProfile = { ...merged, language: lang } as TravelProfile;
         await startGeneration(finalProfile, nextStrings);
       }
     } catch (e: unknown) {
@@ -170,10 +165,17 @@ export default function ChatOnboarding() {
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3 shadow-sm">
         <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">AI</div>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-800 text-sm">AI Travel Planner</p>
           <p className="text-xs text-green-500">● Online</p>
         </div>
+        <LanguageSelect value={lang} onChange={setLang} compact />
+        <button
+          onClick={() => router.push(user ? '/plans' : '/login')}
+          className="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100"
+        >
+          {user ? 'My Trips' : 'Login'}
+        </button>
       </div>
 
       {/* Messages */}

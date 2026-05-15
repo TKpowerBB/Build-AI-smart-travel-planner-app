@@ -10,7 +10,7 @@ export async function GET() {
     .from('travel_plans')
     .select('id, title, profile, version, status, created_at, updated_at')
     .eq('user_id', user.id)
-    .eq('status', 'saved')
+    .or('status.eq.saved,status.is.null')
     .order('updated_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

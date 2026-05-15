@@ -5,12 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { DailyItinerary, TravelProfile } from '@/types';
 import { injectAds } from '@/utils/adInjector';
 import { repairItinerary } from '@/utils/repairItinerary';
-import { detectLanguageCommand } from '@/utils/detectLanguageCommand';
 import { parseModelJSON } from '@/utils/json';
-import { t } from '@/lib/i18n/strings';
+import { UiLang } from '@/utils/langTracker';
 import DayTabs from '@/components/planner/DayTabs';
 import DayView from '@/components/planner/DayView';
 import PlannerChat from '@/components/planner/PlannerChat';
+import LanguageSelect from '@/components/LanguageSelect';
 
 export default function SavedPlanPage() {
   const router = useRouter();
@@ -40,28 +40,8 @@ export default function SavedPlanPage() {
   const handleEdit = async (command: string): Promise<void | { confirmation?: string }> => {
     if (!profile) return;
 
-    // Show the typing indicator during intent detection too — the AI
-    // fallback in detectLanguageCommand can add ~500ms and we don't
-    // want dead air in the chat.
     setEditLoading(true);
     try {
-      // UI-language switch: update profile + persist, don't touch itinerary.
-      const targetLang = await detectLanguageCommand(command);
-      if (targetLang && targetLang !== profile.language) {
-        const nextProfile = { ...profile, language: targetLang };
-        setProfile(nextProfile);
-        try {
-          await fetch(`/api/plans/${planId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile: nextProfile }),
-          });
-        } catch {
-          // Non-fatal — the UI has already switched; a refresh will resync.
-        }
-        return { confirmation: t(targetLang).planner.languageChanged };
-      }
-
       // Strip injected ad cards before sending — they aren't real itinerary data
       const clean = itinerary.map((day) => ({
         ...day,
@@ -116,6 +96,21 @@ export default function SavedPlanPage() {
     }
   };
 
+  const handleLanguageChange = async (language: UiLang) => {
+    if (!profile) return;
+    const nextProfile = { ...profile, language };
+    setProfile(nextProfile);
+    try {
+      await fetch(`/api/plans/${planId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: nextProfile }),
+      });
+    } catch {
+      // UI language still changes locally; persistence can be retried by the next save.
+    }
+  };
+
   if (loading || !profile) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -136,12 +131,17 @@ export default function SavedPlanPage() {
           <p className="font-semibold text-gray-800 text-sm truncate">{title}</p>
           <p className="text-xs text-gray-400">{profile.destination} · {itinerary.length} days</p>
         </div>
+        <LanguageSelect
+          value={(profile.language as UiLang) || 'en'}
+          onChange={handleLanguageChange}
+          compact
+        />
         <span className="text-xs text-green-500 bg-green-50 px-2 py-1 rounded-full">Saved</span>
       </div>
 
       <DayTabs days={itinerary} selected={selectedDay} onChange={setSelectedDay} />
       <DayView day={itinerary[selectedDay]} companions={profile.companions} />
-      <PlannerChat onCommand={handleEdit} loading={editLoading} lang={(profile.language as 'en' | 'ko' | 'ja') || 'en'} />
+      <PlannerChat onCommand={handleEdit} loading={editLoading} lang={(profile.language as UiLang) || 'en'} />
     </div>
   );
 }
